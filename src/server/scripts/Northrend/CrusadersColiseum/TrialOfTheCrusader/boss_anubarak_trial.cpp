@@ -19,6 +19,7 @@
 #include "PassiveAI.h"
 #include "Player.h"
 #include "ScriptedCreature.h"
+#include "SpellAuraEffects.h"
 #include "SpellScript.h"
 #include "SpellScriptLoader.h"
 #include "trial_of_the_crusader.h"
@@ -384,7 +385,7 @@ public:
 
         void KilledUnit(Unit* who) override
         {
-            if( who->GetTypeId() == TYPEID_PLAYER )
+            if( who->IsPlayer() )
                 Talk(SAY_KILL_PLAYER);
         }
 
@@ -399,7 +400,7 @@ public:
 
         void MoveInLineOfSight(Unit* who) override
         {
-            if (who->GetTypeId() != TYPEID_PLAYER || me->GetExactDistSq(who) > 6400.0f) // 80yd*80yd
+            if (!who->IsPlayer() || me->GetExactDistSq(who) > 6400.0f) // 80yd*80yd
                 return;
 
             if (me->getStandState() != UNIT_STAND_STATE_STAND)
@@ -845,7 +846,7 @@ public:
                 {
                     target->UpdatePosition(*c, false);
                     target->CastCustomSpell(SPELL_SPIKE_FAIL, SPELLVALUE_MAX_TARGETS, 1);
-                    if( target->GetTypeId() == TYPEID_UNIT )
+                    if( target->IsCreature() )
                         target->ToCreature()->AI()->DoAction(-1);
                     Remove();
                     return;
@@ -954,4 +955,3 @@ void AddSC_boss_anubarak_trial()
     new spell_gen_leeching_swarm();
     new spell_gen_leeching_swarm_dmg();
 }
-
