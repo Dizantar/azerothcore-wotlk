@@ -738,6 +738,20 @@ bool Unit::GetRandomContactPoint(Unit const* obj, float& x, float& y, float& z, 
     return true;
 }
 
+Unit* Unit::getAttackerForHelper() const
+{
+    if (GetVictim() != nullptr)
+        return GetVictim();
+
+    if (!IsEngaged())
+        return nullptr;
+
+    if (!m_attackers.empty())
+        return *(m_attackers.begin());
+
+    return nullptr;
+}
+
 void Unit::UpdateInterruptMask()
 {
     m_interruptMask = 0;
@@ -1041,9 +1055,9 @@ uint32 Unit::DealDamage(Unit* attacker, Unit* victim, uint32 damage, CleanDamage
 
         if (!victim->IsPlayer())
         {
-            // Part of Evade mechanics. DoT's and Thorns / Retribution Aura do not contribute to this
+            /// @fix: Hack to avoid premature leashing
             if (damagetype != DOT && damage > 0 && !victim->GetOwnerGUID().IsPlayer() && (!spellProto || !spellProto->HasAura(SPELL_AURA_DAMAGE_SHIELD)))
-                victim->ToCreature()->SetLastDamagedTime(GameTime::GetGameTime().count() + MAX_AGGRO_RESET_TIME);
+                victim->ToCreature()->UpdateLeashExtensionTime();
 
             if (attacker)
             {
@@ -1833,7 +1847,10 @@ void Unit::DealMeleeDamage(CalcDamageInfo* damageInfo, bool durabilityLoss)
     if (damageInfo->blocked_amount && damageInfo->TargetState != VICTIMSTATE_BLOCKS)
         victim->HandleEmoteCommand(EMOTE_ONESHOT_PARRY_SHIELD);
 
-    if (damageInfo->TargetState == VICTIMSTATE_PARRY)
+    // Parry haste is enabled if it's not a creature or if the creature doesn't have the NO_PARRY_HASTEN flag.
+    bool isParryHasteEnabled = !victim->IsCreature() ||
+        !victim->ToCreature()->GetCreatureTemplate()->HasFlagsExtra(CREATURE_FLAG_EXTRA_NO_PARRY_HASTEN);
+    if (damageInfo->TargetState == VICTIMSTATE_PARRY && isParryHasteEnabled)
     {
         // Get attack timers
         float offtime  = float(victim->getAttackTimer(OFF_ATTACK));
@@ -10387,6 +10404,8 @@ void Unit::CombatStop(bool includingCast)
     RemoveAllAttackers();
     if (IsPlayer())
         ToPlayer()->SendAttackSwingCancelAttack();     // melee and ranged forced attack cancel
+    if (Creature* pCreature = ToCreature())
+        pCreature->ClearLastLeashExtensionTimePtr();
     ClearInCombat();
 
     // xinef: just in case
@@ -13539,6 +13558,10 @@ void Unit::SetInCombatWith(Unit* enemy, uint32 duration)
             return;
         }
     }
+
+    if (Creature* pCreature = ToCreature())
+        pCreature->UpdateLeashExtensionTime();
+
     SetInCombatState(false, enemy, duration);
 }
 
@@ -13696,6 +13719,8 @@ void Unit::SetInCombatState(bool PvP, Unit* enemy, uint32 duration)
 
         if (enemy)
         {
+            creature->UpdateLeashExtensionTime();
+
             if (IsAIEnabled)
                 creature->AI()->JustEngagedWith(enemy);
 
@@ -17214,6 +17239,17 @@ void Unit::SetContestedPvP(Player* attackedPlayer, bool lookForNearContestedGuar
     }
 }
 
+void Unit::SetCantProc(bool apply)
+{
+    if (apply)
+        ++m_procDeep;
+    else
+    {
+        ASSERT(m_procDeep);
+        --m_procDeep;
+    }
+}
+
 void Unit::AddPetAura(PetAura const* petSpell)
 {
     if (!IsPlayer())
@@ -20192,13 +20228,24 @@ void Unit::OutDebugInfo() const
 class AuraMunchingQueue : public BasicEvent
 {
 public:
-    AuraMunchingQueue(Unit& owner, ObjectGuid targetGUID, int32 basePoints, uint32 spellId) : _owner(owner), _targetGUID(targetGUID), _basePoints(basePoints), _spellId(spellId) { }
+    AuraMunchingQueue(Unit& owner, ObjectGuid targetGUID, int32 basePoints, uint32 spellId, AuraEffect* aurEff, AuraType auraType) : _owner(owner), _targetGUID(targetGUID), _basePoints(basePoints), _spellId(spellId), _aurEff(aurEff), _auraType(auraType) { }
 
     bool Execute(uint64 /*eventTime*/, uint32 /*updateTime*/) override
     {
         if (_owner.IsInWorld() && _owner.FindMap())
             if (Unit* target = ObjectAccessor::GetUnit(_owner, _targetGUID))
-                _owner.CastCustomSpell(_spellId, SPELLVALUE_BASE_POINT0, _basePoints, target, TriggerCastFlags(TRIGGERED_FULL_MASK & ~TRIGGERED_NO_PERIODIC_RESET), nullptr, nullptr, _owner.GetGUID());
+            {
+                bool auraFound = false; // Used to ensure _aurEff exists to avoid wild pointer access/crash
+                Unit::AuraEffectList const& auraEffects = target->GetAuraEffectsByType(_auraType);
+                for (Unit::AuraEffectList::const_iterator j = auraEffects.begin(); j != auraEffects.end(); ++j)
+                    if ((*j) == _aurEff)
+                        auraFound = true;
+
+                if (!auraFound)
+                    _aurEff = nullptr;
+
+                _owner.CastCustomSpell(_spellId, SPELLVALUE_BASE_POINT0, _basePoints, target, TriggerCastFlags(TRIGGERED_FULL_MASK & ~TRIGGERED_NO_PERIODIC_RESET), nullptr, _aurEff, _owner.GetGUID());
+            }
 
         return true;
     }
@@ -20208,13 +20255,16 @@ private:
     ObjectGuid _targetGUID;
     int32 _basePoints;
     uint32 _spellId;
+    AuraEffect* _aurEff;
+    AuraType _auraType;
 };
 
 void Unit::CastDelayedSpellWithPeriodicAmount(Unit* caster, uint32 spellId, AuraType auraType, int32 addAmount, uint8 effectIndex)
 {
+    AuraEffect* aurEff = nullptr;
     for (AuraEffectList::iterator i = m_modAuras[auraType].begin(); i != m_modAuras[auraType].end(); ++i)
     {
-        AuraEffect* aurEff = *i;
+        aurEff = *i;
         if (aurEff->GetCasterGUID() != caster->GetGUID() || aurEff->GetId() != spellId || aurEff->GetEffIndex() != effectIndex || !aurEff->GetTotalTicks())
             continue;
 
@@ -20224,9 +20274,9 @@ void Unit::CastDelayedSpellWithPeriodicAmount(Unit* caster, uint32 spellId, Aura
 
     // xinef: delay only for casting on different unit
     if (this == caster || !sWorld->getBoolConfig(CONFIG_MUNCHING_BLIZZLIKE))
-        caster->CastCustomSpell(spellId, SPELLVALUE_BASE_POINT0, addAmount, this, TriggerCastFlags(TRIGGERED_FULL_MASK & ~TRIGGERED_NO_PERIODIC_RESET), nullptr, nullptr, caster->GetGUID());
+        caster->CastCustomSpell(spellId, SPELLVALUE_BASE_POINT0, addAmount, this, TriggerCastFlags(TRIGGERED_FULL_MASK & ~TRIGGERED_NO_PERIODIC_RESET), nullptr, aurEff, caster->GetGUID());
     else
-        caster->m_Events.AddEvent(new AuraMunchingQueue(*caster, GetGUID(), addAmount, spellId), caster->m_Events.CalculateQueueTime(400));
+        caster->m_Events.AddEvent(new AuraMunchingQueue(*caster, GetGUID(), addAmount, spellId, aurEff, auraType), caster->m_Events.CalculateQueueTime(400));
 }
 
 void Unit::SendClearTarget()
