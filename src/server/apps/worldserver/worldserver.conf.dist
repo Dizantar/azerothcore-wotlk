@@ -4438,6 +4438,13 @@ DailyRBGArenaPoints.MinLevel = 71
 
 MunchingBlizzlike.Enabled = 1
 
+#     AllowTrackBothResources
+#        Description: Allows players to track herbs and minerals at the same time (if they have the skills)
+#        Default:     0 - (Do not allow)
+#                     1 - (Allow)
+
+AllowTrackBothResources = 0
+
 #
 #    Daze.Enabled
 #        Description: Enable or disable the chance for mob melee attacks to daze the victim.

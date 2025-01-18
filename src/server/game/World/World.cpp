@@ -660,6 +660,7 @@ void World::LoadConfigSettings(bool reload)
     _int_configs[CONFIG_INTERVAL_SAVE]                    = sConfigMgr->GetOption<int32>("PlayerSaveInterval", 15 * MINUTE * IN_MILLISECONDS);
     _int_configs[CONFIG_INTERVAL_DISCONNECT_TOLERANCE]    = sConfigMgr->GetOption<int32>("DisconnectToleranceInterval", 0);
     _bool_configs[CONFIG_STATS_SAVE_ONLY_ON_LOGOUT]       = sConfigMgr->GetOption<bool>("PlayerSave.Stats.SaveOnlyOnLogout", true);
+    _bool_configs[CONFIG_ALLOW_TRACK_BOTH_RESOURCES]      = sConfigMgr->GetOption<bool>("AllowTrackBothResources", false);
 
     _int_configs[CONFIG_MIN_LEVEL_STAT_SAVE] = sConfigMgr->GetOption<int32>("PlayerSave.Stats.MinLevel", 0);
     if (_int_configs[CONFIG_MIN_LEVEL_STAT_SAVE] > MAX_LEVEL || int32(_int_configs[CONFIG_MIN_LEVEL_STAT_SAVE]) < 0)
