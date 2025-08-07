@@ -23,6 +23,7 @@
 #include "Duration.h"
 #include "ObjectGuid.h"
 #include "SharedDefines.h"
+#include "WorldConfig.h"
 #include <unordered_map>
 
 class WorldPacket;
@@ -541,8 +542,6 @@ public:
     virtual void LoadDBAllowedSecurityLevel() = 0;
     [[nodiscard]] virtual bool getAllowMovement() const = 0;
     virtual void SetAllowMovement(bool allow) = 0;
-    virtual void SetNewCharString(std::string const& str) = 0;
-    [[nodiscard]] virtual std::string const& GetNewCharString() const = 0;
     [[nodiscard]] virtual LocaleConstant GetDefaultDbcLocale() const = 0;
     [[nodiscard]] virtual std::string const& GetDataPath() const = 0;
     [[nodiscard]] virtual Seconds GetNextDailyQuestsResetTime() const = 0;
@@ -557,17 +556,16 @@ public:
     virtual void ShutdownCancel() = 0;
     virtual void ShutdownMsg(bool show = false, Player* player = nullptr, const std::string& reason = std::string()) = 0;
     virtual void Update(uint32 diff) = 0;
-    virtual void setRate(Rates rate, float value) = 0;
-    [[nodiscard]] virtual float getRate(Rates rate) const = 0;
-    virtual void setBoolConfig(WorldBoolConfigs index, bool value) = 0;
-    [[nodiscard]] virtual bool getBoolConfig(WorldBoolConfigs index) const = 0;
-    virtual void setFloatConfig(WorldFloatConfigs index, float value) = 0;
-    [[nodiscard]] virtual float getFloatConfig(WorldFloatConfigs index) const = 0;
-    virtual void setIntConfig(WorldIntConfigs index, uint32 value) = 0;
-    [[nodiscard]] virtual uint32 getIntConfig(WorldIntConfigs index) const = 0;
-    virtual void setWorldState(uint32 index, uint64 value) = 0;
-    [[nodiscard]] virtual uint64 getWorldState(uint32 index) const = 0;
-    virtual void LoadWorldStates() = 0;
+    virtual void setRate(ServerConfigs index, float value) = 0;
+    [[nodiscard]] virtual float getRate(ServerConfigs index) const = 0;
+    virtual void setBoolConfig(ServerConfigs index, bool value) = 0;
+    [[nodiscard]] virtual bool getBoolConfig(ServerConfigs index) const = 0;
+    virtual void setFloatConfig(ServerConfigs index, float value) = 0;
+    [[nodiscard]] virtual float getFloatConfig(ServerConfigs index) const = 0;
+    virtual void setIntConfig(ServerConfigs index, uint32 value) = 0;
+    [[nodiscard]] virtual uint32 getIntConfig(ServerConfigs index) const = 0;
+    virtual void setStringConfig(ServerConfigs index, std::string const& value) = 0;
+    virtual std::string_view getStringConfig(ServerConfigs index) const = 0;
     [[nodiscard]] virtual bool IsPvPRealm() const = 0;
     [[nodiscard]] virtual bool IsFFAPvPRealm() const = 0;
     virtual uint32 GetNextWhoListUpdateDelaySecs() = 0;
