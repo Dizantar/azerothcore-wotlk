@@ -1973,6 +1973,11 @@ bool Aura::CanStackWith(Aura const* existingAura) const
             return true;
     }
 
+    // Check for custom server setting to allow tracking both Herbs and Minerals
+    if (m_spellInfo->HasAura(SPELL_AURA_TRACK_RESOURCES) && existingSpellInfo->HasAura(SPELL_AURA_TRACK_RESOURCES)) {
+        return true;
+    }
+
     // check spell specific stack rules
     if (m_spellInfo->IsAuraExclusiveBySpecificWith(existingSpellInfo)
             || (sameCaster && m_spellInfo->IsAuraExclusiveBySpecificPerCasterWith(existingSpellInfo)))
