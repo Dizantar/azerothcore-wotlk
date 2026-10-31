@@ -1456,6 +1456,12 @@ struct BattlegroundAVScore final : public BattlegroundScore
 {
     friend class BattlegroundAV;
 
+    [[nodiscard]] uint32 GetGraveyardsAssaulted() const { return GraveyardsAssaulted; }
+    [[nodiscard]] uint32 GetGraveyardsDefended() const { return GraveyardsDefended; }
+    [[nodiscard]] uint32 GetTowersAssaulted() const { return TowersAssaulted; }
+    [[nodiscard]] uint32 GetTowersDefended() const { return TowersDefended; }
+    [[nodiscard]] uint32 GetMinesCaptured() const { return MinesCaptured; }
+
 protected:
     explicit BattlegroundAVScore(ObjectGuid playerGuid) : BattlegroundScore(playerGuid) { }
 
@@ -1538,9 +1544,13 @@ public:
 
     TeamId GetPrematureWinner() override;
 
-    [[nodiscard]] BG_AV_NodeInfo const& GetAVNodeInfo(uint32 node) const { return m_Nodes[node]; }
-    [[nodiscard]] bool IsCaptainAlive(uint8 index) const { return m_CaptainAlive[index]; }
-    [[nodiscard]] TeamId GetMineOwner(uint8 index) const { return m_Mine_Owner[index]; }
+    [[nodiscard]] BG_AV_NodeInfo const& GetAVNodeInfo(uint32 node) const
+    {
+        ASSERT(node < BG_AV_NODES_MAX);
+        return m_Nodes[node];
+    }
+    [[nodiscard]] bool IsCaptainAlive(uint8 index) const { return index < PVP_TEAMS_COUNT && m_CaptainAlive[index]; }
+    [[nodiscard]] TeamId GetMineOwner(uint8 index) const { return index < PVP_TEAMS_COUNT ? m_Mine_Owner[index] : TEAM_NEUTRAL; }
 
 private:
     void PostUpdateImpl(uint32 diff) override;
@@ -1556,7 +1566,7 @@ private:
     void DefendNode(BG_AV_Nodes node, TeamId teamId);
 
     void PopulateNode(BG_AV_Nodes node);
-    void DePopulateNode(BG_AV_Nodes node, bool ignoreSpiritGuid = false);
+    void DePopulateNode(BG_AV_Nodes node, bool ignoreSpiritGuid = false, bool towerDefended = false);
 
     BG_AV_Nodes GetNodeThroughObject(uint32 object);
     uint32 GetObjectThroughNode(BG_AV_Nodes node);
